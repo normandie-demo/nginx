@@ -1,0 +1,41 @@
+---
+ hosts: front
+  become: true
+  become_user: root
+  become_method: sudo
+
+  tasks:
+  - name: Install NGINX
+    dnf:
+      name: nginx
+
+  - name: Count nginx process
+    shell: ps -ef | grep {{ main_service }} | grep -v grep | wc -l
+    register: result
+
+  - name: Display count
+    debug:
+      msg: "There is {{ result.stdout }} nginx process up"
+
+  - name: Start Service
+    systemd:
+      name: "{{ main_service }}"
+      state: started
+    when: result.stdout == "0"
+
+  - name: Copy config
+    copy:
+      src: nginx.conf
+      dest: /etc/nginx/nginx.conf
+    notify: "Restart NGINX"
+
+  - template:
+      src: index.html.j2
+      dest: /usr/share/nginx/html/index.html
+      force: yes
+  
+  handlers:
+  - name: Restart NGINX
+    systemd:
+      name: "{{ main_service }}"
+      state: restarted
